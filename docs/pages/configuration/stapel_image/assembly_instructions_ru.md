@@ -60,131 +60,94 @@ summary: |
 
 ## Пользовательские стадии
 
+***Пользовательские стадии*** — это [_стадии_]({{ site.baseurl }}/ru/documentation/reference/stages_and_images.html) со сборочными инструкциями из [конфигурации]({{ site.baseurl}}/ru/documentation/configuration/introduction.html#%D1%87%D1%82%D0%BE-%D1%82%D0%B0%D0%BA%D0%BE%D0%B5-%D0%BA%D0%BE%D0%BD%D1%84%D0%B8%D0%B3%D1%83%D1%80%D0%B0%D1%86%D0%B8%D1%8F-werf). Другими словами, — это стадии, которые конфигурирует пользователь (существуют также служебные стадии, корторые пользователь конфигурировать не может). В настоящее время существует два вида сборочных инструкций: _shell_ и _ansible_.
 
-***User stage*** is a [_stage_]({{ site.baseurl }}/documentation/reference/stages_and_images.html) with _assembly instructions_ from config.
-Currently, there are two kinds of assembly instructions: _shell_ and _ansible_. Werf
-defines 4 _user stages_ and executes them in this order: _beforeInstall_, _install_,
-_beforeSetup_ and _setup_. Assembly instructions from one stage are executed to
-create one docker layer.
+В Werf существуют 4 _пользовательские стадии_, которые исполняются последовательно в следующем порядке: _beforeInstall_, _install_, _beforeSetup_ и _setup_. В результате исполнения инструкций какой-либо стадии создается один Docker-слой. Т.е. по одному слою на все стадию, в независимости от количества инструкций в ней.
 
-## Motivation behind stages
+## Причины использовать стадии
 
-### Opinionated build structure
+### Своя концепция структуры сборки (opinionated software)
 
-_User stages pattern_ is based on analysis of real applications building
-instructions. It turns out that group assembly instructions into 4 _user stages_
-are enough for most applications. Instructions grouping decrease layers sizes
-and speed up image building.
+Шаблон и механизм работы _пользовательских стадий_ основан на анализе сборки реальных приложений. В результате анализа мы пришли к выводу, что для того, чтобы качественно улучшить сборку большинства приложений достаточно разбить инструкции сборки на 4 группы (эти группы и есть — _пользовательские стадии_) подчиняющиеся определенным правилам. Такая группировка уменьшает количество слоев и ускоряет сборку.
 
-### Framework for a build process
+### Четкая структура сборочного процесса
 
-_User stages pattern_ defines a structure for building process and thus set
-boundaries for a developer. This is a high speed up over unstructured
-instructions in Dockerfile because developer knows what kind of instructions
-should be on each _stage_.
+Наличие _пользовательских стадий_ определяет структуру процесса сборки и, таким образом, устанавливает некоторые рамки для разработчика. Не смотря на дополнительное ограничение по сравнению с неструктурированными инструкциями Docker-файла, это наоборот дает выигрыш в скорости, т.к. разработчик знает, какие инструкции на каком этапе должны быть.
 
-### Run assembly instruction on git changes
+### Запуск инструкций сборки при изменениях в git-репозитории
 
-_User stage_ execution can depend on changes of files in a git repository. Werf
-supports local and remote git repositories. User stage can be
-dependent on changes in several repositories. Different changes in one
-repository can cause a rebuild of different _user stages_.
+Werf может использовать как локальные так и удаленные git-репозитории при сборке. Любой _пользовательской стадии_ можно определить зависимость от изменения конкретных файлов или папок в одном или нескольких git-репозиториях. Это дает возможность принудительно пересобирать _пользовательскую стадию_ если в локальном или удаленном репозитории (или репозиториях) изменяются какие-либо файлы.
 
-### More build tools: shell, ansible, ...
+### Больше инструментов сборки: shell, ansible, ...
 
-_Shell_ is a familiar and well-known build tool. Ansible is a newer tool and it
-needs some time for learning.
+_Shell_ — знакомый и хорошо известный инструмент сборки. _Ansible_ — более молодой инструмент, требующий чуть больше времени на изучение.
 
-If you need prototype as soon as possible then _the shell_ is enough — it works
-like a `RUN` instruction in Dockerfile. Ansible configuration is declarative and
-mostly idempotent which is good for long-term maintenance.
+Если вам нужен быстрый результат с минимальными затратами времени и как можно быстрее, то использования _shell_ может быть вполне достаточно — все работает аналогично директиве `RUN` в Dockerfile.
 
-Stage execution is isolated in code, so implementing support for another tool
-is not so difficult.
+В случае с _Ansible_ применяется декларативный подход и подразумевается идемпотентность операций. Такой подход дает более предсказуемый результат, особенно в случае проектов большого жизненного цикла.
 
-## Usage of user stages
+Архитектура Werf позволяет добавлять в будущем поддержку и других инструментов сборки.
 
-Werf provides 4 _user stages_ where assembly instructions can be defined. Assembly
-instructions are not limited by werf. You can define whatever you define for `RUN`
-instruction in Dockerfile. However, assembly instructions grouping arises from
-experience with real-life applications. So the vast majority of application builds
-need these actions:
+## Использование пользовательских стадий
 
-- install system packages
-- install system dependencies
-- install application dependencies
-- setup system applications
-- setup application
+Werf позволяет определять до четырех _пользовательских стадий_ с инструкциями сборки. На содержание самих инструкций сборки Werf не накладывает каких-либо ограничений, т.е. вы можете указывать все те же инструкции, которые указывали в Dockerfile в директиве `RUN`. Однако важно не просто перенести инструкции из Dockerfile, а правильно разбить их на _пользовательские стадии_. Мы предлагаем такое разбиение исходя из опыта работы с реальными приложениями, и вся суть тут в том, что большинство сборок приложений проходят следующие этапы:
+- установка системных пакетов
+- установка системных зависимостей
+- установка зависимостей приложения
+- настройка системных пакетов
+- настройка приложения
 
-What is the best strategy to execute them? First thought is to execute them one
-by one to cache interim results. The other thought is not to mix instructions
-for these actions because of different file dependencies. _User stages pattern_
-suggests this strategy:
-
-- use _beforeInstall_ user stage for installing system packages
-- use _install_ user stage to install system dependencies and application dependencies
-- use _beforeSetup_ user stage to setup system settings and install an application
-- use _setup_ user stage to setup application settings
+Какая может быть наилучшая стратегия выполнения этих этапов? Может показаться очевидным, что лучше всего выполнять эти этапы последовательно, кешируя промежуточные результаты. Либо, как вариант, — не смешивать инструкции этапов, из-за разных файловых зависимостей. Шаблон _пользовательских стадий_ предлагает следующую стратегию:
+- использовать стадию _beforeInstall_ для инсталляции системных пакетов;
+- использовать стадию _install_ для инсталляции системных зависимостей и зависимостей приложения;
+- использовать стадию _beforeSetup_ для настройки системных параметров и установки приложения;
+- использовать стадию _setup_ для настройки приложения.
 
 ### beforeInstall
 
-A stage that executes instructions before install an application. This stage
-is for system applications that rarely changes but time consuming to install.
-Also, long-lived system settings can be done here like setting locale, setting
-time zone, adding groups and users, etc. Installation of enormous language
-distributions and build tools like PHP and composer, java and gradle, etc. are good candidates to execute at this stage.
+Данная стадия предназначена для выполнения инструкций перед установкой приложения. Сюда следует относить установку системных приложений которые редко изменяются, но установка которых занимает много времени. Примером таких приложений могут быть — языковые пакеты, инструменты сборки, такие как composer, java, gradle и т. д. Также сюда правильно относить инструкции настройки системы, которые меняются редко, например — языковые настройки, настройки часового пояса, добавление пользователей и групп.
 
-In practice, these components are rarely changes, and _beforeInstall_ stage caches
-them for an extended period.
+Поскольку эти компоненты меняются редко, они будут кэшироваться в рамках стадии _beforeInstall_ на длительный период.
 
 ### install
 
-A stage to install an application. This stage is for installation of
-application dependencies and setup some standard settings.
+Данная стадия предназначена для установки приложения и его зависимостей, а также выполнения базовых настроек.
 
-Instructions on this stage have access to application source codes, so
-application dependencies can be installed with build tools (like composer,
-gradle, npm, etc.) that require some manifest file (i.e., pom.xml,
-Gruntfile). Best practice is to make this stage dependent on changes in that
-manifest file.
+На данной стадии появляется доступ к исходному коду (директива git), и возможна установка зависимостей на основе manifest-файлов с использованием таких инструментов как composer, gradle, npm и т.д. Поскольку сборка стадии зависит от manifest-файла, для достижения наилучшего результата важно связать изменение в manifest-файлах репозитория с данной стадией. Например, если в проекте используется composer, то установление зависимости от файла composer.lock позволит пересобирать стадию _beforeInstall_, в случае изменения файла composer.lock.
 
 ### beforeSetup
 
-This stage is for prepare application before setup some settings. Every kind
-of compilation can be done here: creating jars, creating executable files and
-dynamic libraries, creating web assets, uglification and encryption. This stage
-often makes to be dependent on changes in source codes.
+Данная стадия предназначена для подготовки приложения перед настройкой.
+
+На данной стадии рекомендуется выполнять разного рода компиляцию и обработку. Например — компиляция jar-файлов, бинарных файлов, файлов библиотек, создание ассетов web-приложений, минификация, шифрование и т.п. Перечисленные операции как правило зависят от изменений в исходном коде, и на данной стадии также важно определить достаточные зависимости изменений в репозитории. Логично, что зависимость данной стадии от изменений в репозитории будет покрывать уже большую область файлов в репозитории, чем на предыдущей стадии, и, соответственно, ее пересборка будет выполняться чаще.
+
+При правильно определенных зависимостях, изменение в коде приложения дожно вызывать пересборку стадии _beforeSetup_, в случае если не изменялся manifest-файл. А в случае если manifest-файл изменился, должна уже вызываться пересборка стадии _install_ и следующих за ней стадий.
 
 ### setup
 
-This stage is to setup application settings. The usual actions here are copying
-some profiles into `/etc`, copying configuration files into well-known
-locations, creating a file with the application version. These actions should not be
-time-consuming as they execute on every commit.
+Данная стадия предназначена для настройки приложения.
 
-### custom strategy
+Обычно на данной стадии выполняется копирование файлов конфигурации (например в папку `/etc`), создание файлов текущей версии приложения и т.д.  Такого рода операции не должны быть затратными по времени, т.к. они скорее всего будут выполняться при каждом новом коммите в репозитории.
 
-Again, there are no limitations for assembly instructions. The previous
-definitions of _user stages_ are just suggestions arise from experience with real
-applications. You can even use only one _user stage_ or define your strategy
-of grouping assembly instructions and get benefits from caching and git
-dependencies.
+### Пользовательская стратегия
 
-## Syntax
+Не смотря на изложенную четкую стратегию шаблона _пользовательских стадий_ и назначения каждой стадии, по сути нет никаких ограничений. Предложенные назначения каждой стадии являются лишь рекомендацией, которые основаны на нашем анализе работы реальных приложений. Вы можете использовать только одну пользовательскую стадию, либо определить свою стратегию группировки инструкций, чтобы получить преимущества кэширования и зависимостей от изменений в git-репозиториях с учетом особенностей сборки вашего приложения.
 
-There are two ***builder directives*** for assembly instructions on top level: `shell` and `ansible`. These builder directives are mutually exclusive. You can build an image with ***shell assembly instructions*** or with ***ansible assembly instructions***.
+## Синтаксис
 
-_Builder directive_ has four directives which define assembly instructions for each _user stage_:
+Пользовательские стадии и инструкции сборки определяются внутри двух взаимоисключающих директив вида сборочных инструкций — `shell` и `ansible`. Вы можете собирать образ используя внутри всех стадий либо сборочные инструкции ***shell***, либо сборочные инструкции ***ansible***.
+
+Внутри директив вида сборочных инструкций можно указывать четыре директивы сборочных инструкций каждой _пользовательской стадии_, соответственно:
 - `beforeInstall`
 - `install`
 - `beforeSetup`
 - `setup`
 
-Builder directives also contain ***cacheVersion  directives*** that are user-defined parts of _user stages signatures_. More details in a [CacheVersion](#dependency-on-cacheversion-values) section.
+Внутри директив вида сборочных инструкций также можно указывать директивы версий кэша (***cacheVersion***), которые по сути являются частью сигнатуры каждой _пользовательской стадии_. Более подробно об этом читай в [соответствующем разделе](#dependency-on-cacheversion-values) section.
 
 ## Shell
 
-Syntax for _user stages_ with _shell assembly instructions_:
+Синтаксис описания _пользовательских стадий_ при использовании сборочных инструкций _shell_:
 
 ```yaml
 shell:
@@ -209,9 +172,11 @@ shell:
   setupCacheVersion: <version>
 ```
 
-_Shell assembly instructions_ are arrays of bash commands for _user stages_. Commands for one stage are executed as one `RUN` instruction in Dockerfile, and thus werf creates one layer for one _user stage_.
+Сборочные инструкции _shell_ — это массив bash-комманд для соответствующей _пользовательской стадии_. Все команды одной стадии выполняются как одна инструкция `RUN`  в Dockerfile, т.е. в результате создается один слой на каждую _пользовательскую стадию_.
 
-Werf provides distribution agnostic bash binary, so you need no bash binary in the [base image]({{ site.baseurl }}/documentation/configuration/stapel_image/base_image.html). Commands for one stage are joined with `&&` and then encoded as base64. _User stage assembly container_ runs decoding and then executes joined commands. For example, _beforeInstall_ stage with `apt-get update` and `apt-get install` commands:
+Werf при сборке использует собственный исполняемый файл bash и вам не нужно отдельно добавлять его в образ (или [базовый образ]({{ site.baseurl }}/documentation/configuration/stapel_image/base_image.html)) при сборке. Все команды одной стадии объединяются с помощью выражения `&&` bash и кодируются алгоритмом base64 перед передачей в _сборочный контейнер_. _Сборочный контейнер_ пользовательской стадии декодирует команды и запускает их.
+
+Пример описания стадии _beforeInstall_ содержащей команды `apt-get update` и `apt-get install`:
 
 ```yaml
 beforeInstall:
@@ -219,8 +184,8 @@ beforeInstall:
 - apt-get install -y build-essential g++ libcurl4
 ```
 
-Werf performs _user stage_ commands as follows:
-- generates temporary script on host machine
+Werf выполнит команды стадии следующим образом::
+- на хост-машине сгенерируется временный скрипт:
 
     ```bash
     #!/.werf/stapel/embedded/bin/bash -e
@@ -229,15 +194,14 @@ Werf performs _user stage_ commands as follows:
     apt-get install -y build-essential g++ libcurl4
     ```
 
-- mounts to corresponding _user stage assembly container_ as `/.werf/shell/script.sh`, and
-- runs the script.
+- скрипт смонтируется в _сборочный контейнер_ как `/.werf/shell/script.sh`
+- скрипт выполнится.
 
-> `bash` binary is stored in a _stapel volume_. Details about the concept can be found in this [blog post [RU]](https://habr.com/company/flant/blog/352432/) (referred `dappdeps` has been renamed to `stapel` but the principle is the same)
-
+> Исполняемый фаил `bash` находится внутри Docker-тома _stapel_. Подробнее про эту концепцию можно узнать в этой [статье](https://habr.com/company/flant/blog/352432/) (упоминаемый в статье `dappdeps` был переименован в `stapel`, но принцип сохранился)
 
 ## Ansible
 
-Syntax for _user stages_ with _ansible assembly instructions_:
+Синтаксис описания _пользовательских стадий_ при использовании сборочных инструкций _ansible_:
 
 ```yaml
 ansible:
@@ -264,9 +228,7 @@ ansible:
 
 ### Ansible config and stage playbook
 
-_Ansible assembly instructions_ for _user stage_ is a set of ansible tasks. To run
-this tasks with `ansible-playbook` command werf mounts this directory structure
-into the _user stage assembly container_:
+Сборочные инструкции _ansible_ —  это массив Ansible-заданий для соответствующей _пользовательской стадии_. Для запуска этих заданий с помощью `ansible-playbook` Werf монтирует следующую структуру папок в _сборочнй контейнер_:
 
 ```bash
 /.werf/ansible-workdir
@@ -275,17 +237,15 @@ into the _user stage assembly container_:
 └── playbook.yml
 ```
 
-`ansible.cfg` contains settings for ansible:
-- use local transport
-- werf stdout_callback for better logging
-- turn on force_color
-- use sudo for privilege escalation (no need to use `become` in tasks)
+`ansible.cfg` содержит настройки для Ansible:
+- использование локального транспорта (transport = local)
+- подключение callback плагина werf для удобного логирования (stdout_callback = werf)
+- включение режима цвета (force_color = 1)
+- установка использования `sudo` для повышения привелегий (чтобы небыло необходимости использовать `become` в ansible-заданиях)
 
-`hosts` is an inventory file and contains the only localhost. Also, there are some
-ansible_* settings, i.e., the path to python in stapel.
+`hosts` — inventory-файл, содержит только localhost и некоторые `ansible_*` параметры.
 
-`playbook.yml` is a playbook with all tasks from one _user stage_. For example,
-`werf.yaml` with _install_ stage like this:
+`playbook.yml` — playbook, содержащий все задания соответствующей _пользовательской стадии_. Пример `werf.yaml` с описанием стадии _install_:
 
 ```yaml
 ansible:
@@ -301,14 +261,14 @@ ansible:
   ...
 ```
 
-werf produces this `playbook.yml` for _install_ stage:
+В приведенном примере, Werf сгенерирует следующий `playbook.yml` для стадии _install_:
 ```yaml
 - hosts: all
   gather_facts: 'no'
   tasks:
   - debug: msg='Start install'  \
   - file: path=/etc mode=0777   |
-  - copy:                        > these lines are copied from werf.yaml
+  - copy:                        > эти строки будут скопированы из werf.yaml
       src: /bin/sh              |
       dest: /bin/sh.orig        |
   - apk:                        |
@@ -317,50 +277,39 @@ werf produces this `playbook.yml` for _install_ stage:
   ...
 ```
 
-Werf plays the _user stage_ playbook in the _user stage assembly container_ with `playbook-ansible`
-command:
+Werf выполняет playbook _пользовательской стадии_ в сборочном контейнере стадии с помощью команды `playbook-ansible`:
 
 ```bash
 $ export ANSIBLE_CONFIG="/.werf/ansible-workdir/ansible.cfg"
 $ ansible-playbook /.werf/ansible-workdir/playbook.yml
 ```
 
-`ansible` and `python` binaries and libraries are stored in a _stapel volume_. Details about the concept can be found in this [blog post [RU]](https://habr.com/company/flant/blog/352432/) (referred `dappdeps` has been renamed to `stapel` but the principle is the same).
+> Исполняемые файлы и библиотеки `ansible` и `python` находятся внутри Docker-тома _stapel_. Подробнее про эту концепцию можно узнать в этой [статье](https://habr.com/company/flant/blog/352432/) (упоминаемый в статье `dappdeps` был переименован в `stapel`, но принцип сохранился)
 
-### Supported modules
+### Поддерживаемые модули
 
-One of the ideas behind werf is idempotent builds. If nothing changed — werf
-should create the same image. This task accomplished by _signature_ calculation
-for _stages_. Ansible has non-idempotent modules — they are giving different
-results if executed twice and werf cannot correctly calculate _signature_ to
-rebuild _stages_. For now, there is a list of supported modules:
+Одной из концепций, которую использует Werf, является идемпотентность сборки. Это значит что если "ничего не изменилось", то Werf при повторном и последующих запусках сборки должен создавать бинарно идентичные образы. В Werf эта задача решается с помощью подсчета _сигнатур стадий_.
 
-- [Command modules](https://docs.ansible.com/ansible/2.5/modules/list_of_commands_modules.html): command, shell, raw, script.
+Многие модули Ansible не являются идемпотентными, т.е. они могут давать разный результат запусков при неизменных входных параметрах. Это, конечно, не дает возможность корректно высчитывать _сигнатуру_ стадии, чтобы определять реальную необходимость её пересборки из-за изменений. Это привело к тому, что список поддерживаемых модулей был ограничен.
 
-- [Crypto modules](https://docs.ansible.com/ansible/2.5/modules/list_of_crypto_modules.html): openssl_certificate, and other.
+На текущий момент, список поддерживаемых модулей Ansible следующий:
 
-- [Files modules](https://docs.ansible.com/ansible/2.5/modules/list_of_files_modules.html): acl, archive, copy, stat, tempfile, and other.
-
+- [Commands modules](https://docs.ansible.com/ansible/2.5/modules/list_of_commands_modules.html): command, shell, raw, script.
+- [Crypto modules](https://docs.ansible.com/ansible/2.5/modules/list_of_crypto_modules.html): openssl_certificate и другие.
+- [Files modules](https://docs.ansible.com/ansible/2.5/modules/list_of_files_modules.html): acl, archive, copy, stat, tempfile и другие.
 - [Net Tools Modules](https://docs.ansible.com/ansible/2.5/modules/list_of_net_tools_modules.html): get_url, slurp, uri.
-
-- [Packaging/Language modules](https://docs.ansible.com/ansible/2.5/modules/list_of_packaging_modules.html#language): composer, gem, npm, pip, and other.
-
-- [Packaging/OS modules](https://docs.ansible.com/ansible/2.5/modules/list_of_packaging_modules.html#os): apt, apk, yum, and other.
-
-- [System modules](https://docs.ansible.com/ansible/2.5/modules/list_of_system_modules.html): user, group, getent, locale_gen, timezone, cron, and other.
-
+- [Packaging/Language modules](https://docs.ansible.com/ansible/2.5/modules/list_of_packaging_modules.html#language): composer, gem, npm, pip и другие.
+- [Packaging/OS modules](https://docs.ansible.com/ansible/2.5/modules/list_of_packaging_modules.html#os): apt, apk, yum и другие.
+- [System modules](https://docs.ansible.com/ansible/2.5/modules/list_of_system_modules.html): user, group, getent, locale_gen, timezone, cron и другие.
 - [Utilities modules](https://docs.ansible.com/ansible/2.5/modules/list_of_utilities_modules.html): assert, debug, set_fact, wait_for.
 
-_Werf config_ with the module not from this list gives an error and stops a build. Feel free to report an issue if some module should be enabled.
+При указании в _конфигурации сборки_ модуля отсутствущего в приведенном списке, сборка прервется с ошибкой. Не стесняйтесь [сообщать](https://github.com/flant/werf/issues/new) нам, если вы считаете что какой-либо модуль должен быть включен в список поддерживаемых.
 
-### Copy files
+### Копирование файлов
 
-The preferred way of copying files into an image is [_git mappings_]({{ site.baseurl }}/documentation/configuration/stapel_image/git_directive.html). Werf cannot calculate changes of files referred in `copy` module. The only way to
-copy some external file into an image, for now, is to use the go-templating method
-`.Files.Get`. This method returns file content as a string. So content of the file becomes a part of _user stage signature_, and file changes lead to _user stage_
-rebuild.
+Предпочтительный способ копирования файлов в образ ­— использование [_git-маппинга_]({{ site.baseurl }}/ru/documentation/configuration/stapel_image/git_directive.html). Werf не может определять изменения в копируемых файлах при использовании модуля `copy`. Единственный вариант копирования внешнего файла в образ на такущий момент — использовать метод `.Files.Get` Go-шаблона. Данный метод возвращает содержимое файла как строку, что дает возможность использовать содержимое как часть _пользовательской стадии_. Таким образом, при изменении содержимого файла изменится сигнатура соответствующей стадии, что приведет к пересборке всей стадии.
 
-For example, copy `nginx.conf` into an image:
+Пример копирования файла `nginx.conf` в образ:
 
 {% raw %}
 ```yaml
@@ -373,7 +322,7 @@ ansible:
 ```
 {% endraw %}
 
-Werf renders that snippet as go template and then transforms it into this `playbook.yml`:
+Werf применит Go-шаблонизатор и в результате получится подобный `playbook.yml`:
 
 ```yaml
 - hosts: all
@@ -389,14 +338,11 @@ Werf renders that snippet as go template and then transforms it into this `playb
             ...
 ```
 
-### Jinja templating
+### Шаблоны Jinja
 
-Ansible supports [Jinja templating](https://docs.ansible.com/ansible/2.5/user_guide/playbooks_templating.html) of playbooks. However, Go templates and Jinja
-templates has the same delimiters: {% raw %}`{{` and `}}`{% endraw %}. Jinja templates should be escaped
- to work. There are two possible variants: escape only {% raw %}`{{`{% endraw %} or escape
-the whole Jinja expression.
+В Ansible реализована поддержка шаблонов [Jinja](https://docs.ansible.com/ansible/2.5/user_guide/playbooks_templating.html) в playbook'ах. Однако, у Go-шаблонов и Jinja-шаблонов одинаковый разделитель: {% raw %}`{{` и `}}`{% endraw %}. Чтобы использовать Jinja-шаблоны в конфигурации Werf, их нужно экранировать. Для этого есть два варианта: экранировать только {% raw %}`{{`{% endraw %}, либо экранировать все выражение шаблона Jinja.
 
-For example, you have this ansible task:
+Например, у вас есть следующая задача Ansible:
 
 {% raw %}
 ```yaml
@@ -410,50 +356,43 @@ For example, you have this ansible task:
 {% endraw %}
 
 {% raw %}
-So, Jinja expression `{{item}}` should be escaped:
+Тогда, выражение Jinja-шаблона `{{item}}` должно быть экранировано:
 {% endraw %}
 
 {% raw %}
 ```yaml
-# escape {{ only
+# экранируем только {{
 src: {{"{{"}} item }}
 ```
-or
+либо
 ```yaml
-# escape the whole expression
+# экранируем все выражение
 src: {{`{{item}}`}}
 ```
 {% endraw %}
 
-### Ansible problems
+### Проблемы с Ansible
 
-- Live stdout implemented for raw and command modules. Other modules display stdout and stderr content after execution.
-- Excess logging into stderr may hang ansible task execution ([issue #784](https://github.com/flant/werf/issues/784)).
-- `apt` module hangs build process on particular debian and ubuntu versions. This affects derived images as well ([issue #645](https://github.com/flant/werf/issues/645)).
+- Live-вывод реализован только для модулей `raw` и `command`. Остальные модули отображают вывод каналов `stdout` и `stderr` после выполнения, что приводит к задержкам, скачкообразному выводу.
+- Большой вывод в `stderr` может подвесить выполнение Ansible-задачи ([issue #784](https://github.com/flant/werf/issues/784)).
+- Модуль `apt` подвисает на некоторых версиях Debian и Ubuntu. Проявляется также на наследуемых образах([issue #645](https://github.com/flant/werf/issues/645)).
 
-## User stages dependencies
+## Зависимости пользовательских стадий
 
-One of the werf features is an ability to define dependencies for _stage_ rebuild.
-As described in [_stages_ reference]({{ site.baseurl }}/documentation/reference/stages_and_images.html), _stages_ are built one by one, and each _stage_ has
-a calculated _stage signature_. _Signatures_ have various dependencies. When
-dependencies are changed, the _stage signature_ is changed, and werf rebuild this _stage_ and
-all following _stages_.
+Одна из особенностей Werf — возможность определять зависимости при которых происходит пересборка _стадии_.
+Как указано в [справочнике]({{ site.baseurl }}/ru/documentation/reference/stages_and_images.html), сборка _стадий_ выполняется последовательно, одна за другой, и для каждой _стадии_ высчитывается _сигнатура стадии_. У _сигнатур_ есть ряд зависимостей, при изменении которых _сигнатура стадии_ меняется, что служит для Werf сигналом для пересборки стадии с измененной _сигнатурой_. Поскольку каждая следующая _стадия_ имеет зависимость в том числе и от предыдущей _стадии_ согласно _конвейеру стадий_, при изменении сигнатуры какой-либо _стадии_, произойдет пересборка и _стадии_ с измененной сигнатурой и всех последующих _стадий_.
 
-These dependencies can be used for defining rebuild for the
-_user stages_. _User stages signatures_ and so rebuilding of the _user stages_
-depends on:
-- changes in assembly instructions
-- changes of _cacheVersion directives_
-- git repository changes
-- changes in files that imports from an [artifacts]({{ site.baseurl }}/documentation/configuration/stapel_artifact.html)
+_Сигнатура пользовательских стадий_ и соответственно пересборка _пользовательских стадий_ зависит от изменений:
+- в инструкциях сборки
+- в директивах семейства _cacheVersion_
+- в git-репозитории (или git-репозиториях)
+- в файлах, импортируемых из [артефактов]({{ site.baseurl }}/ru/documentation/configuration/stapel_artifact.html)
 
-First three dependencies are described further.
+Первые три описанных варианта зависимостей, рассматриваются подробно далее.
 
-## Dependency on assembly instructions changes
+## Зависимость от изменений в инструкциях сборки
 
-_User stage signature_ depends on rendered assembly instructions text. Changes in
-assembly instructions for _user stage_ lead to the rebuilding of this _stage_. E.g., you
-use the following _shell assembly instructions_:
+_Сигнатура пользовательской стадии_ зависит от итогового текста инструкций, т.е. после применения шаблонизатора. Любые изменения в тексте инструкций с учетмо применения шаблонизатора Go или Jinja (в случае Ansible) в _пользовательской стадии_ приводят к пересборке _стадии_. Например, вы используете следующие _shell-инструкции_ :
 
 ```yaml
 shell:
@@ -467,11 +406,9 @@ shell:
   - echo "Commands on the Setup stage"
 ```
 
-First, build of this image execute all four _user stages_. There is no _git mapping_ in
-this _config_, so next builds never execute assembly instructions because _user
-stages signatures_ not changed and build cache remains valid.
+При первой сборке этого образа буду выполнены инструкции всех четырех _пользовательских стадий_. В данной конфигурации нет _git-маппинга_, так что последующие сборки не приведут к повторному выполнению инструкций — _сигнатура пользовательских стадий_ не изменялась, сборочный кэш содержит актуальную информацию (валиден).
 
-Changing assembly instructions for _install_ user stage:
+Изменим инструкцию сборки для стадии _install_:
 
 ```yaml
 shell:
@@ -486,8 +423,7 @@ shell:
   - echo "Commands on the Setup stage"
 ```
 
-Now `werf build` executes _install assembly instructions_ and instructions from
-following _stages_.
+Запуск Werf для сборки приведет к выплонению всех инструкций стадии _install_ и инструкций последующих _стадий_.
 
 Go-templating and using environment variables can changes assembly instructions
 and lead to unforeseen rebuilds. For example:

@@ -334,22 +334,15 @@ results if executed twice and werf cannot correctly calculate _signature_ to
 rebuild _stages_. For now, there is a list of supported modules:
 
 - [Command modules](https://docs.ansible.com/ansible/2.5/modules/list_of_commands_modules.html): command, shell, raw, script.
-
 - [Crypto modules](https://docs.ansible.com/ansible/2.5/modules/list_of_crypto_modules.html): openssl_certificate, and other.
-
 - [Files modules](https://docs.ansible.com/ansible/2.5/modules/list_of_files_modules.html): acl, archive, copy, stat, tempfile, and other.
-
 - [Net Tools Modules](https://docs.ansible.com/ansible/2.5/modules/list_of_net_tools_modules.html): get_url, slurp, uri.
-
 - [Packaging/Language modules](https://docs.ansible.com/ansible/2.5/modules/list_of_packaging_modules.html#language): composer, gem, npm, pip, and other.
-
 - [Packaging/OS modules](https://docs.ansible.com/ansible/2.5/modules/list_of_packaging_modules.html#os): apt, apk, yum, and other.
-
 - [System modules](https://docs.ansible.com/ansible/2.5/modules/list_of_system_modules.html): user, group, getent, locale_gen, timezone, cron, and other.
-
 - [Utilities modules](https://docs.ansible.com/ansible/2.5/modules/list_of_utilities_modules.html): assert, debug, set_fact, wait_for.
 
-_Werf config_ with the module not from this list gives an error and stops a build. Feel free to report an issue if some module should be enabled.
+_Werf config_ with the module not from this list gives an error and stops a build. Feel free to report an [issue](https://github.com/flant/werf/issues/new) if some module should be enabled.
 
 ### Copy files
 
