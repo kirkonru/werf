@@ -57,19 +57,23 @@ var _ = Describe("core", func() {
 		createFileFunc := func(filePath string, fileData []byte, filePerm os.FileMode) {
 			utils.CreateFile(filePath, fileData)
 
-			gitUpdateIndexCommandArgs := []string{"update-index", "--add"}
-			if filePerm == gitExecutableFilePerm {
-				gitUpdateIndexCommandArgs = append(gitUpdateIndexCommandArgs, "--chmod=+x")
-			} else {
-				gitUpdateIndexCommandArgs = append(gitUpdateIndexCommandArgs, "--chmod=-x")
-			}
-			gitUpdateIndexCommandArgs = append(gitUpdateIndexCommandArgs, filePath)
+			if runtime.GOOS == "windows" {
+				gitUpdateIndexCommandArgs := []string{"update-index", "--add"}
+				if filePerm == gitExecutableFilePerm {
+					gitUpdateIndexCommandArgs = append(gitUpdateIndexCommandArgs, "--chmod=+x")
+				} else {
+					gitUpdateIndexCommandArgs = append(gitUpdateIndexCommandArgs, "--chmod=-x")
+				}
+				gitUpdateIndexCommandArgs = append(gitUpdateIndexCommandArgs, filePath)
 
-			utils.RunSucceedCommand(
-				testDirPath,
-				"git",
-				gitUpdateIndexCommandArgs...,
-			)
+				utils.RunSucceedCommand(
+					testDirPath,
+					"git",
+					gitUpdateIndexCommandArgs...,
+				)
+			} else {
+				Ω(os.Chmod(filePath, filePerm)).Should(Succeed())
+			}
 		}
 
 		fileLifecycleEntryItBody := func(entry fileLifecycleEntry) {
