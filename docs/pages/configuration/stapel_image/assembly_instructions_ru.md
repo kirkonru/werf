@@ -60,7 +60,7 @@ summary: |
 
 ## Пользовательские стадии
 
-***Пользовательские стадии*** — это [_стадии_]({{ site.baseurl }}/ru/documentation/reference/stages_and_images.html) со сборочными инструкциями из [конфигурации]({{ site.baseurl}}/ru/documentation/configuration/introduction.html#%D1%87%D1%82%D0%BE-%D1%82%D0%B0%D0%BA%D0%BE%D0%B5-%D0%BA%D0%BE%D0%BD%D1%84%D0%B8%D0%B3%D1%83%D1%80%D0%B0%D1%86%D0%B8%D1%8F-werf). Другими словами, — это стадии, которые конфигурирует пользователь (существуют также служебные стадии, корторые пользователь конфигурировать не может). В настоящее время существует два вида сборочных инструкций: _shell_ и _ansible_.
+***Пользовательские стадии*** — это [_стадии_]({{ site.baseurl }}/ru/documentation/reference/stages_and_images.html) со сборочными инструкциями из [конфигурации]({{ site.baseurl}}/ru/documentation/configuration/introduction.html#что-такое-конфигурация-werf). Другими словами, — это стадии, которые конфигурирует пользователь (существуют также служебные стадии, корторые пользователь конфигурировать не может). В настоящее время существует два вида сборочных инструкций: _shell_ и _ansible_.
 
 В Werf существуют 4 _пользовательские стадии_, которые исполняются последовательно в следующем порядке: _beforeInstall_, _install_, _beforeSetup_ и _setup_. В результате исполнения инструкций какой-либо стадии создается один Docker-слой. Т.е. по одному слою на все стадию, в независимости от количества инструкций в ней.
 
@@ -143,7 +143,7 @@ Werf позволяет определять до четырех _пользов
 - `beforeSetup`
 - `setup`
 
-Внутри директив вида сборочных инструкций также можно указывать директивы версий кэша (***cacheVersion***), которые по сути являются частью сигнатуры каждой _пользовательской стадии_. Более подробно об этом читай в [соответствующем разделе](#dependency-on-cacheversion-values) section.
+Внутри директив вида сборочных инструкций также можно указывать директивы версий кэша (***cacheVersion***), которые по сути являются частью сигнатуры каждой _пользовательской стадии_. Более подробно об этом читай в [соответствующем разделе](#зависимость-от-значения-cacheversion) section.
 
 ## Shell
 
@@ -406,7 +406,7 @@ shell:
   - echo "Commands on the Setup stage"
 ```
 
-При первой сборке этого образа буду выполнены инструкции всех четырех _пользовательских стадий_. В данной конфигурации нет _git-маппинга_, так что последующие сборки не приведут к повторному выполнению инструкций — _сигнатура пользовательских стадий_ не изменялась, сборочный кэш содержит актуальную информацию (валиден).
+При первой сборке этого образа будут выполнены инструкции всех четырех _пользовательских стадий_. В данной конфигурации нет _git-маппинга_, так что последующие сборки не приведут к повторному выполнению инструкций — _сигнатура пользовательских стадий_ не изменялась, сборочный кэш содержит актуальную информацию (валиден).
 
 Изменим инструкцию сборки для стадии _install_:
 
@@ -423,10 +423,9 @@ shell:
   - echo "Commands on the Setup stage"
 ```
 
-Запуск Werf для сборки приведет к выплонению всех инструкций стадии _install_ и инструкций последующих _стадий_.
+Сигнатура стадии _install_ изменилась, и запуск Werf для сборки приведет к выполнению всех инструкций стадии _install_ и инструкций последующих _стадий_, т.е. _beforeSetup_ и _setup_.
 
-Go-templating and using environment variables can changes assembly instructions
-and lead to unforeseen rebuilds. For example:
+Сигнатура стадии может меняться также из-за использования переменных окружения и Go-шаблонов, — если делать это не продуманно, то можно получить в результате неожиданнеы пересборки стадий. Например:
 
 {% raw %}
 ```yaml
@@ -439,37 +438,36 @@ shell:
 ```
 {% endraw %}
 
-First build renders _beforeInstall command_ into:
+Первая сборка высчитает сигнатуру стадии _beforeInstall_ на основе команды наример такой (хэш коммита конечно будет другой):
 ```bash
 echo "Commands on the Before Install stage for 0a8463e2ed7e7f1aa015f55a8e8730752206311b"
 ```
 
-Build for the next commit renders _beforeInstall command_ into:
+После очередного коммита, при сборке сигнатура стадии _beforeInstall_ уже будет другой (с других хэшем коммита), например:
 
 ```bash
 echo "Commands on the Before Install stage for 36e907f8b6a639bd99b4ea812dae7a290e84df27"
 ```
 
-Using `CI_COMMIT_SHA` assembly instructions text changes every commit.
-So this configuration rebuilds _beforeInstall_ user stage on every commit.
+Соответственно, используя переменную `CI_COMMIT_SHA` сигнатура стадии _beforeInstall_ будет меняться после каждого коммита, что будет приводить к пересборке.
 
-## Dependency on git repo changes
+## Зависимость от изменений в git-репозитории
 
 <a class="google-drawings" href="https://docs.google.com/drawings/d/e/2PACX-1vRv56S-dpoTSzLC_24ifLqJHQoHdmJ30l1HuAS4dgqBgUzZdNQyA1balT-FwK16pBbbXqlLE3JznYDk/pub?w=1956&amp;h=648" data-featherlight="image">
     <img src="https://docs.google.com/drawings/d/e/2PACX-1vRv56S-dpoTSzLC_24ifLqJHQoHdmJ30l1HuAS4dgqBgUzZdNQyA1balT-FwK16pBbbXqlLE3JznYDk/pub?w=622&amp;h=206">
   </a>
 
-As stated in a _git mapping_ reference, there are _gitArchive_ and _gitLatestPatch_ stages. _gitArchive_ is executed after _beforeInstall_ user stage, and _gitLatestPatch_ is executed after _setup_ user stage if a local git repository has changes. So, to execute assembly instructions with the latest version of source codes, you may rebuild _gitArchive_ with [special commit]({{site.baseurl}}/documentation/configuration/stapel_image/git_directive.html#rebuild-of-git_archive-stage) or rebuild _beforeInstall_ (change _cacheVersion_ or instructions for _beforeInstall_ stage).
+Как описывалось в статье про [_git mapping_]({{ site.baseurl}}/ru/documentation/configuration/stapel_image/git_directive.html), существуют специалные стадии _gitArchive_ и _gitLatestPatch_. Стадия _gitArchive_ выполняется после пользовательской стадии _beforeInstall_, а стадия _gitLatestPatch_ — после пользовательской стадии _setup_, если в локальном git-репозитории есть изменения. Таким образом, чтобы выполнить сборку с последней версией исходного кода можно либо пересобрать стадию _gitArchive_ с помощью [специального коммита]({{site.baseurl}}/ru/documentation/configuration/stapel_image/git_directive.html#сброс-стадии-gitarchive), либо пересобрать стадию _beforeInstall_ (изменив значение директивы _cacheVersion_ либо изменив сами инструкции стадии _beforeInstall_).
 
-_install_, _beforeSetup_ and _setup_ user stages are also dependant on git repository changes. A git patch is applied at the beginning of _user stage_ to execute assembly instructions with the latest version of source codes.
+Пользовательские стадии _install_, _beforeSetup_ и _setup_ также могут зависеть от изменений в git-репозитории. В этом случае (если такая зависимость определена) git-патч применяется перед выполнением _пользовательской стадии_, чтобы сборочные инструкции выполнялись с последней версией кода приложения.
 
-> During image build process source codes are updated **only within one stage**, subsequent stages are based on this stage and use actualized files. First build adds sources on _gitArchive_ stage. Any other build updates sources on _gitCache_, _gitLatestPatch_ or on one of the following user stages: _install_, _beforeSetup_ and _setup_.
+> Во время процесса сборки, исходный код обновляется **только в рамках одной стадии**, последующие стадии зависящие последовательно друг от друга, будут использовать также обновленную версию файлов. Первая сборка добавляет файлы из git-репозиотрия на стадии _gitArchive_. Все последующие сборки обновляют файлы  на стадии _gitCache_, _gitLatestPatch_ или на одной из следующих пользовательских стадий: _install_, _beforeSetup_, _setup_.
 <br />
 <br />
-This stage is shown in _Calculation signature phase_
+Пример этого этапа (фаза подсчета сигнатур —_calculating signatures_):
 ![git files actualized on specific stage]({{ site.baseurl }}/images/build/git_mapping_updated_on_stage.png)
 
-_User stage_ dependency on git repository changes is defined with `git.stageDependencies` parameter. Syntax is:
+Зависимость _пользовательской стадии_ от изменений в git-репозитории указывается с помощью параметра `git.stageDependencies`. Синтаксис:
 
 ```yaml
 git:
@@ -486,41 +484,42 @@ git:
     - <mask>
 ```
 
-`git.stageDependencies` parameter has 3 keys: `install`, `beforeSetup` and `setup`. Each key defines an array of masks for one user stage. User stage is rebuilt if a git repository has changes in files that match with one of the masks defined for _user stage_.
+У параметра `git.stageDependencies` возможно указывать 3 ключа: `install`, `beforeSetup` и `setup`. Значение каждого ключа — массив масок файлов, относящихся к соответствующей стадии. Соответствующая _пользовательская стадия_ пересобирается, если в git-репозитории происходят изменения подпадающие под указанную маску.
 
-For each _user stage_ werf creates a list of matched files and calculates a checksum over each file attributes and content. This checksum is a part of _stage signature_. So signature is changed with every change in a repository: getting new attributes for the file, changing file's content, adding a new matched file, deleting a matched file, etc.
+Для каждой _пользовательской стадии_ Werf создает список подпадающих под маску файлов и вычисляет контрольную сумму каждого файла с учетом его аттрибутов и содержимого. Эти контрольные суммы являются частью _сигнатуры стадии_, поэтому любое изменение файлов в репозитории, подпадающее под маску, приводит к изменениям _сигнатуры стадии_. К этим изменениям относятся: изменение атрибутов файла, изменение содержимого файла, добавление или удаление подпадающего под маску файла и т.п..
 
-`git.stageDependencies` masks work together with `git.includePaths` and `git.excludePaths` masks. werf considers only files matched with `includePaths` filter and `stageDependencies` masks. Likewise, werf considers only files not matched with `excludePaths` filter and matched with `stageDependencies` masks.
+При применении маски указанной в `git.stageDependencies` учитываются значения параметров `git.includePaths` и `git.excludePaths` (смотри подробнее про них в соответствующем [разделе]({{site.baseurl}}/ru/documentation/configuration/stapel_image/git_directive.html#использование-фильтров). Werf считает подпадающими под маску только файлы удовлетворяющие фильтру `includePaths` и подпадающие под маску `stageDependencies`. Аналогично, Werf считает подпадающими под маску только файлы не удовлетворяющие фильтру `excludePaths` и не подпадающие под маску `stageDependencies`.
 
-`stageDependencies` masks works like `includePaths` and `excludePaths` filters. Masks are matched with files paths and may contain the following glob patterns:
+Правила описания маски в параметре `stageDependencies` аналогичны описанию параметров `includePaths` и `excludePaths`. Маска определяет шаблон для файлов и путей, и может содержать следующие шаблоны:
 
-- `*` — matches any file. This pattern includes `.` and excludes `/`
-- `**` — matches directories recursively or files expansively
-- `?` — matches any one character. Equivalent to /.{1}/ in regexp
-- `[set]` — matches any one character in the set. Behaves exactly like character sets in regexp, including set negation ([^a-z])
-- `\` — escapes the next metacharacter
+- `*` — удовлетворяет любому файлу. Шаблон включает `.` и исключает `/`.
+- `**` — удовлетворяет директории со всем ее содержимым, рекурсивно.
+- `?` — удовлетворяет любому однму символу в имени файла (аналогично regexp-шаблону `/.{1}/`)
+- `[set]` — удовлетворяет любому символу из указанного набора символов. Аналогично использованию в regexp-шаблонах, включая указание диапазонов типа `[^a-z]`.
+- `\` — экранирует следующий символ
 
-Mask that starts with `*` is treated as anchor name by yaml parser. So mask with `*` or `**` patterns at the beginning should be quoted:
+
+Маска, которая начинается с шаблона `*` или `**`, должна быть взята в одинарные или двойные кавычки в `werf.yaml`:
 
 ```
-# * at the beginning of mask, so use double quotes
+# * в начале маски, используем двойные кавычки
 - "*.rb"
-# single quotes also work
+# одинарные также работают
 - '**/*'
-# no star at the beggining, no quoting needed
+# нет * в начале, можно не использовать кавычки
 - src/**/*.js
 ```
 
-Werf determines whether the files changes in the git repository with use of checksums. For _user stage_ and for each mask, the following algorithm is applied:
+Werf определяет изменились ли файлы в git-репозитории используя подсчет их контрольных сумм. Для _пользовательской стадии_ и для каждой маски применяется следующий алгоритм:
 
-- werf creates a list of all files from `add` path and apply `excludePaths` and `includePaths` filters:
-- each file path from the list compared to the mask with the use of glob patterns;
-- if mask matches a directory then this directory content is matched recursively;
-- werf calculates checksum of attributes and content of all matched files.
+- Werf создает список всех файлов согласно пути определенному в параметре `add`, и применяет фильтры `excludePaths` и `includePaths`;
+- к каждому файлу с учетом его пути применяется маска согласно правил применения шаблонов;
+- если под маску подпадает папка, то все содержимое папки считается подпадающей под маску рекурсивно;
+- у получившегося списка файлов Werf подсчитывает контрольные суммы с учетом аттрибутов файлов и их содержимого.
 
-These checksums are calculated in the beginning of the build process before any stage container is ran.
+Контрольные суммы подсчитываются вначале сборочного процесса, перед запуском какой-либо стадии..
 
-Example:
+Пример:
 
 ```yaml
 ---
@@ -540,22 +539,21 @@ shell:
   - echo "setup stage"
 ```
 
-This `werf.yaml` has a git mapping configuration to transfer `/src` content from local git repository into `/app` directory in the image. During the first build, files are cached in _gitArchive_ stage and assembly instructions for _install_ and _beforeSetup_ are executed. The next builds of commits that have only changes outside of the `/src` do not execute assembly instructions. If a commit has changes inside `/src` directory, then checksums of matched files are changed, werf will apply git patch, rebuild all existing stages since _beforeSetup_: _beforeSetup_ and _setup_. Werf will apply patch on the _beforeSetup_ stage itself.
+В приведенном файле конфигурации `werf.yaml` указан git-маппинг, согласно которому содержимое папки `/src` локального git-репозитория копируется в папку `/app` собираемого образа. Во время первой сборки, файлы кэшируются в стадии _gitArchive_ и выполняются сборочные инструкции стадий _install_, _beforeSetup_ и _setup_.
 
-## Dependency on CacheVersion values
+Сборка после следующего коммита, в котором будут только изменения файлов за пределами папки `/src` не приведет к выполнению инструкций каких-либо стадий. Если же коммит будет содержать изменение внутри папки `/src`, контрольные суммы файлов подпадающих под маску изменятся, Werf применит git-патч и пересоберет все пользовательские стадии начиная со стадии _beforeSetup_, а именно — _beforeSetup_ и _setup_. Применение git-патча будет выполнено один раз, на стадии _beforeSetup_.
 
-There are situations when a user wants to rebuild all or one of _user stages_. This
-can be accomplished by changing `cacheVersion` or `<user stage name>CacheVersion` values.
+## Зависимость от значения CacheVersion
 
-Signature of the _install_ user stage depends on the value of the
-`installCacheVersion` parameter. To rebuild the _install_ user stage (and
-subsequent stages), you need to change the value of the `installCacheVersion` parameter.
+Существуют ситуации, когда необходимо принудительно пересобрать все или какую-то конкретную _пользовательскую стадию_. Этого можно достичь изменяя параметры `cacheVersion` или `<user stage name>CacheVersion`.
 
-> Note that `cacheVersion` and `beforeInstallCacheVersion` directives have the same effect. When these values are changed, then the _beforeInstall_ stage and subsequent stages rebuilt.
+Сигнатура пользовательской стадии _install_ зависит от значения параметра `installCacheVersion`. Чтобы пересобрать пользовательскую стадию _install_ (и все последующие стадии), можно изменить значение параметра `installCacheVersion`.
 
-### Example: common image for multiple applications
+> Обратите внимание, что параметры `cacheVersion` и `beforeInstallCacheVersion` имеют одинаковый эффект, — при изменении этих параметров возникает пересборка стадии  _beforeInstall_ и всех последующих стадий.
 
-You can define an image with common packages in separated `werf.yaml`. `cacheVersion` value can be used to rebuild this image to refresh packages versions.
+### Пример: Общий обрз для нескольких приложений
+
+Вы можете определить образ, содержащий общие системные пакеты в отдельном файле `werf.yaml`. Изменение параметра `cacheVersion` может быть использовано для пересборки этого образа, чтобы обновить версии системных пакетов.
 
 ```yaml
 image: ~
@@ -567,11 +565,11 @@ shell:
   - apt install ...
 ```
 
-This image can be used as base image for multiple applications if images from hub.docker.com doesn't suite your needs.
+Этот образ может быть использован как базовый образ для нескольких приложений, например если образ с hub.docker.com не удовлетворяет вашим требованиям.
 
-### External dependency example
+### Пример использования внешних зависимостей
 
-_CacheVersion directives_ can be used with [go templates]({{ site.baseurl }}/documentation/configuration/introduction.html#go-templates) to define _user stage_ dependency on files, not in the git tree.
+Параметры _CacheVersion_ можно использовать совместно с [шаблонами Go]({{ site.baseurl }}/ru/documentation/configuration/introduction.html#go-templates) чтобы определить зависимость _пользовательской стадии_ от файлов, не находящихся в git-репозитории.
 
 {% raw %}
 ```yaml
@@ -585,4 +583,4 @@ shell:
 ```
 {% endraw %}
 
-Build script can be used to download `some-library-latest.tar.gz` archive and then execute `werf build` command. If the file is changed then werf rebuilds _install user stage_ and subsequent stages.
+Если использовать, например, скрипт загрузки файла `some-library-latest.tar.gz` и запускать Werf для сборки уже после скачивания файла, то пересборка пользовательской стадии _install_ (и всех последующих) будет происходить в случае если скачан новый (изменный) файл.

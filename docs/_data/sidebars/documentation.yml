@@ -433,7 +433,7 @@ entries:
           - title: Интеграция с Gitlab CI/CD
             url: /ru/documentation/guides/gitlab_ci_cd_integration.html
 
-          - title: Интеграция с другими CI/CD системами
+          - title: Интеграция с неподдерживаемыми системами CI/CD
             url: /ru/documentation/guides/unsupported_ci_cd_integration.html
 
           - title: Расширенная сборка
