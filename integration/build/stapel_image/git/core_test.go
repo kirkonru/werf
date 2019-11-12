@@ -7,6 +7,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 
@@ -55,7 +56,20 @@ var _ = Describe("core", func() {
 
 		createFileFunc := func(filePath string, fileData []byte, filePerm os.FileMode) {
 			utils.CreateFile(filePath, fileData)
-			Ω(os.Chmod(filePath, filePerm)).Should(Succeed())
+
+			gitUpdateIndexCommandArgs := []string{"update-index", "--add"}
+			if filePerm == gitExecutableFilePerm {
+				gitUpdateIndexCommandArgs = append(gitUpdateIndexCommandArgs, "--chmod=+x")
+			} else {
+				gitUpdateIndexCommandArgs = append(gitUpdateIndexCommandArgs, "--chmod=-x")
+			}
+			gitUpdateIndexCommandArgs = append(gitUpdateIndexCommandArgs, filePath)
+
+			utils.RunSucceedCommand(
+				testDirPath,
+				"git",
+				gitUpdateIndexCommandArgs...,
+			)
 		}
 
 		fileLifecycleEntryItBody := func(entry fileLifecycleEntry) {
@@ -256,10 +270,15 @@ var _ = Describe("core", func() {
 			dirToAdd        string
 			shouldBeDeleted []string
 			shouldBeSkipped []string
+			skipOnWindows   bool
 		}
 
 		removingEmptyDirectoriesItBody := func(fixturePathFolder string) func(removingEmptyDirectoriesEntry) {
 			return func(entry removingEmptyDirectoriesEntry) {
+				if entry.skipOnWindows && runtime.GOOS == "windows" {
+					Skip("skip on windows")
+				}
+
 				commonBeforeEach(testDirPath, fixturePath(append(fixturesPathParts, fixturePathFolder)...))
 
 				projectAddedFilePath := filepath.Join(entry.dirToAdd, "file")
@@ -332,6 +351,7 @@ var _ = Describe("core", func() {
 				dirToAdd:        "dir/sub dir/sub dir with special ch@ra(c)ters? ()",
 				shouldBeDeleted: []string{"dir/sub dir/sub dir with special ch@ra(c)ters? ()", "dir/sub dir", "dir"},
 				shouldBeSkipped: []string{},
+				skipOnWindows:   true,
 			}),
 		)
 
